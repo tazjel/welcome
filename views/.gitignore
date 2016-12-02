@@ -1,0 +1,9 @@
+*
+!auth
+!auth/*
+!error
+!error/*
+!.gitignore
+!__init__.py
+!layout.html
+!web2py_ajax.html

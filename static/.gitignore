@@ -1,0 +1,8 @@
+*
+!.gitignore
+!css
+!css/*
+!fonts
+!fonts/*
+!js
+!js/*
