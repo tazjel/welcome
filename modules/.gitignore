@@ -1,4 +1,5 @@
 *
+!__init__.py
 !.gitignore
 !appcfg.py
 !rsyslog.py
