@@ -58,10 +58,9 @@ if cfg.db:
     # Auth in db. Require HTTPS. Decouple auth from default controller.
     from gluon.tools import Auth
     auth = Auth(
-        db, propagate_extension='', controller='auth',
-        secure=(request.controller!='appadmin'),
+        db, propagate_extension='', controller='auth', secure=True,
         url_index=URL('default', 'index'))
-    if cfg.auth:
+    if cfg.auth and cfg.auth.get('args'):
         auth.define_tables(**cfg.auth['args'])
     else:
         auth.define_tables(signature=True)
@@ -70,7 +69,7 @@ if cfg.db:
 
     # Scheduler in db.
     from gluon.scheduler import Scheduler
-    if cfg.scheduler:
+    if cfg.scheduler and cfg.scheduler.get('args'):
         scheduler = Scheduler(db, **cfg.scheduler['args'])
     else:
         scheduler = Scheduler(db)
