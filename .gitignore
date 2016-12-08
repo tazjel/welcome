@@ -1,6 +1,5 @@
 *.pyc
 cron
-databases
 errors
 sessions
 uploads
