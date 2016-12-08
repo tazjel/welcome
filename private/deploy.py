@@ -33,17 +33,20 @@ def _init_server_admin():
         admin_group_id = auth.add_group('server admin', 'Server Administrator')
         log.info('Created server admin role')
     found = False
-    qry = auth.db.table_membership().group_id==admin_group_id
-    for member in auth.db(qry).select():
+    qry = auth.table_membership().group_id==admin_group_id
+    for member in db(qry).select():
         if member.user_id.email==admin_addr:
             found = True
         else:
             auth.del_membership(self, admin_group_id, member.user_id)
-            log.info('Removed %s from server admin', member.user_id.email)
+            log.info('Removed %s as server admin', member.user_id.email)
     if not found:
-        user = auth.register_bare(email=admin_addr)
+        user = auth.table_user()(email=admin_addr)
+        if not user:
+            user = auth.register_bare(email=admin_addr)
+            log.info('Registered %s as server admin', admin_addr)
         auth.add_membership(admin_group_id, user.id)
-        log.info('Registered %s as server admin', admin_addr)
+        log.info('Added %s as server admin', admin_addr)
 
 def _send_update_report():
     """ Email the server admin that an update/install is complete. """
@@ -59,7 +62,7 @@ try:
     appname = sys.argv[2]
     admin_addr = sys.argv[3]
     _fix_scheduler()
-    _init_server_admin():
+    _init_server_admin()
     _send_update_report()
     log.info('Deployment complete for %s', sys.argv[1:])
 except:
