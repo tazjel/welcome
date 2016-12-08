@@ -28,11 +28,8 @@ def _init_server_admin():
     """ Initialize the server admin. Allow only a single server admin account,
     the one associated with the target email address. Register a new user if
     an account for the email address doesn't yet exist. """
-    admin_group_id = auth.id_group('server admin')
-    if not admin_group_id:
-        admin_group_id = auth.add_group('server admin', 'Server Administrator')
-        log.info('Created server admin role')
     found = False
+    admin_group_id = auth.id_group(cfg.groups.server_admin)
     qry = auth.table_membership().group_id==admin_group_id
     for member in db(qry).select():
         if member.user_id.email==admin_addr:

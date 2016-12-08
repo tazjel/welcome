@@ -1,6 +1,9 @@
 """ A model to provide the basic globals. """
 import appcfg
 import rsyslog
+from gluon.tools import Auth
+from gluon.tools import Mail
+from gluon.scheduler import Scheduler
 from gluon.storage import Storage
 
 
@@ -46,41 +49,41 @@ T.is_writable = False # No language file updates.
 log = rsyslog.get()
 cfg = Storage(appcfg.get())
 
-if cfg.db:
+# DAL db connection.
+db = DAL(cfg.db['uri'], **cfg.db['args'])
 
-    # DAL db connection.
-    db = DAL(cfg.db['uri'], **cfg.db['args'])
+# Sessions in db. Require HTTPS.
+session.connect(request, response, db)
+session.secure()
 
-    # Sessions in db. Require HTTPS.
-    session.connect(request, response, db)
-    session.secure()
+# Auth in db. Require HTTPS. Decouple auth from default controller.
+auth = Auth(
+    db, propagate_extension='', controller='auth',
+    secure=True, url_index=URL('default', 'index'))
+if cfg.auth and 'args' in cfg.auth:
+    auth.define_tables(**cfg.auth['args'])
+else:
+    auth.define_tables(signature=True)
+auth.settings.login_onfail.append(
+    lambda form: log.warning('Login failure from %s' % request.client))
+if 'disabled' in cfg.auth:
+    for action in cfg.auth['disabled']:
+        auth.settings.actions_disabled.append(action)
 
-    # Auth in db. Require HTTPS. Decouple auth from default controller.
-    from gluon.tools import Auth
-    auth = Auth(
-        db, propagate_extension='', controller='auth', secure=True,
-        url_index=URL('default', 'index'))
-    if cfg.auth and cfg.auth.get('args'):
-        auth.define_tables(**cfg.auth['args'])
-    else:
-        auth.define_tables(signature=True)
-    auth.settings.login_onfail.append(
-            lambda form: log.warning('Login failure from %s' % request.client))
+# Init cfg.groups. Add server admin group.
+cfg.groups = Storage()
+cfg.groups.server_admin = 'server admin'
+if not auth.id_group(cfg.groups.server_admin):
+    auth.add_group(cfg.groups.server_admin, 'Server Administrator')
+    log.info('Added server admin role')
 
-    # Scheduler in db.
-    from gluon.scheduler import Scheduler
-    if cfg.scheduler and cfg.scheduler.get('args'):
-        scheduler = Scheduler(db, **cfg.scheduler['args'])
-    else:
-        scheduler = Scheduler(db)
+# Scheduler in db.
+if cfg.scheduler and 'args' in cfg.scheduler:
+    scheduler = Scheduler(db, **cfg.scheduler['args'])
+else:
+    scheduler = Scheduler(db)
 
-if cfg.mail:
-
-    # Mailer.
-    from gluon.tools import Mail
-    mail = Mail()
-    mail.settings.update(cfg.mail['settings'])
-
-    # Auth mailer.
-    if cfg.db:
-        auth.settings.mailer = mail
+# Mailer.
+mail = Mail()
+mail.settings.update(cfg.mail['settings'])
+auth.settings.mailer = mail
