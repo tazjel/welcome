@@ -10,7 +10,7 @@ Fixes stuff and sends an email to an address. Expects sys.argv:
 
     1. Hostname.
     2. Name of the deployed app.
-    3. Email address to receive notification message.
+    3. Email address of the server admin.
 """
 import datetime
 import sys
@@ -24,20 +24,43 @@ def _fix_scheduler():
     db.scheduler_worker.fields()
     db.scheduler_task_deps.fields()
 
-def _send_email():
+def _init_server_admin():
+    """ Initialize the server admin. Allow only a single server admin account,
+    the one associated with the target email address. Register a new user if
+    an account for the email address doesn't yet exist. """
+    admin_group_id = auth.id_group('server admin')
+    if not admin_group_id:
+        admin_group_id = auth.add_group('server admin', 'Server Administrator')
+        log.info('Created server admin role')
+    found = False
+    qry = auth.db.table_membership().group_id==admin_group_id
+    for member in auth.db(qry).select():
+        if member.user_id.email==admin_addr:
+            found = True
+        else:
+            auth.del_membership(self, admin_group_id, member.user_id)
+            log.info('Removed %s from server admin', member.user_id.email)
+    if not found:
+        user = auth.register_bare(email=admin_addr)
+        auth.add_membership(admin_group_id, user.id)
+        log.info('Registered %s as server admin', admin_addr)
+
+def _send_update_report():
+    """ Email the server admin that an update/install is complete. """
     subject = '%s deployment complete on %s' % (appname, hostname)
     summary = 'Deployment of %s on %s finished %s %s.'
     now = datetime.datetime.now().strftime('on %b %d %Y at %H:%M:%S')
     tz = time.strftime("%Z")
     message = summary % (appname, hostname, now, tz)
-    mail.send(to=[notify_addr], subject=subject, message=message)
+    mail.send(to=[admin_addr], subject=subject, message=message)
 
 try:
     hostname = sys.argv[1]
     appname = sys.argv[2]
-    notify_addr = sys.argv[3]
+    admin_addr = sys.argv[3]
     _fix_scheduler()
-    _send_email()
-    log.info('Deployment finalized and %s notified' % notify_addr)
+    _init_server_admin():
+    _send_update_report()
+    log.info('Deployment complete for %s', sys.argv[1:])
 except:
     log.exception('Error finalizing deployment')
